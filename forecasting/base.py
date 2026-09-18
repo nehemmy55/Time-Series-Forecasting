@@ -16,12 +16,13 @@ class BaseForecaster(ABC):
     """Abstract one-step-ahead forecaster.
 
     Subclasses store their hyperparameters on `self` in `__init__` and
-    declare a `PARAM_GRID` class attribute (dict of {param_name: [values]})
-    describing the space HyperparameterSearch should explore.
+    declare a `PARAM_GRID` class attribute (a curated list of kwargs dicts,
+    one per trial) describing the space HyperparameterSearch should
+    explore.
     """
 
-    #: dict[str, list] — overridden by each subclass.
-    PARAM_GRID: dict = {}
+    #: list[dict] — overridden by each subclass.
+    PARAM_GRID: list = []
 
     @abstractmethod
     def fit(self, series: pd.Series, exog: pd.DataFrame | None = None) -> "BaseForecaster":

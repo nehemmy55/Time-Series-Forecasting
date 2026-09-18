@@ -5,36 +5,44 @@ traffic forecasting, using the Telecom Italia "Milano Grid" SMS-Call-Internet
 dataset (Nov 1, 2013 - Jan 1, 2014; 10,000 geographical areas; 10-minute
 intervals).
 
+The project is notebook-first: all narrative analysis and results live in
+`notebooks/`. `forecasting/` is a small class-based package the notebooks
+call into, so every model and every evaluation goes through the same
+interface (`BaseForecaster` -> `WalkForwardEvaluator`) by construction rather
+than each notebook reimplementing its own prediction loop.
+
+## Package organization (`forecasting/`)
+
+| Module | Contents |
+|---|---|
+| `base.py` | `BaseForecaster` - the abstract interface every model implements: `fit(series, exog=None)`, `predict_one_step(history) -> float`, `describe() -> dict`, and a `PARAM_GRID` class attribute. |
+| `data.py` | `DataLoader` (two-pass chunked aggregation of raw daily files), `SquareSeries` (the one path used everywhere to load/resample/interpolate a square's series), `naive_load_day` / `measure_peak_memory` (the Section-1 memory comparison), and the standard train/val/test split boundaries. |
+| `sarima_forecaster.py` | `SARIMAForecaster` - Fourier-augmented SARIMA (statsmodels). |
+| `gbm_forecaster.py` | `GBMForecaster` - gradient boosting over lag + calendar features (scikit-learn). |
+| `lstm_forecaster.py` | `LSTMForecaster` - a small LSTM (PyTorch, CPU). |
+| `evaluation.py` | `WalkForwardEvaluator` and MAE/MAPE/RMSE - the *only* place evaluation logic lives. True one-step-ahead: at each timestamp the model conditions on real history only, never its own prior prediction. |
+| `tracking.py` | `ExperimentTracker` - appends every training run (model, params, metrics, timestamp, a one-line rationale) to `results/experiment_log.csv`. |
+| `search.py` | `HyperparameterSearch` - runs a `BaseForecaster` subclass's `PARAM_GRID` through `WalkForwardEvaluator` on a validation window, logging every trial plus a closing rationale for the winner via `ExperimentTracker`. |
+| `viz.py` | Shared matplotlib style (colorblind-safe palette) used by every figure. |
+| `utils.py` | `hardware_info()` - used to report the machine the timing numbers were measured on. |
+
 ## Project structure
 
 ```
+forecasting/            the package described above
 data/
-  sms-call-internet-mi-*.txt   raw daily files (gitignored, ~20GB total)
+  raw/                   62 daily .txt files (gitignored, ~20GB total)
   processed/
-    daily/*.parquet            one aggregated file per raw day
+    daily/*.parquet      one aggregated file per raw day (DataLoader output)
     internet_traffic.parquet   combined dataset: square_id, timestamp, internet_traffic
-src/
-  data/
-    schema.py                  raw column layout + dtypes
-    ingest.py                  chunked, memory-efficient aggregation of one raw day
-    build_dataset.py           runs ingest.py over all raw days and combines them
-    memory_naive.py            baseline memory profiling (single full read_csv)
-    memory_optimized.py        optimized memory profiling (chunked + downcast)
-  analysis/
-    style.py                   shared plotting style (colorblind-safe palette)
-    eda.py                     exploratory analysis, produces reports/figures/*.png
-  models/
-    common.py                  splits, input representation, metrics, timing, hardware info
-    sarima_model.py            Model 1: Fourier-augmented SARIMA (statsmodels)
-    gbm_model.py               Model 2: gradient boosting on lag + calendar features (sklearn)
-    lstm_model.py              Model 3: LSTM (PyTorch, CPU)
-    run_experiments.py         orchestrates tuning + evaluation + all Section 4 outputs
-reports/
-  figures/                     generated figures (EDA + 9 forecast plots + failure case)
-  tables/                      per-square metrics CSVs + timing.csv
-  eda_summary.txt              generated numeric evidence (top squares, ADF test, ...)
-  experiment_log.md            hyperparameter search trials + hardware info
-  report.md / report.pdf       full research report (source + rendered PDF)
+notebooks/
+  00_data_pipeline.ipynb      Section 1: raw-file check, memory comparison, build the dataset, rank squares
+  01_eda.ipynb                Section 2: distribution, 5-square series, periodicity heatmap, ACF/PACF+ADF
+  02_experiments.ipynb        Section 3+4: literature review, hyperparameter search, final evaluation
+  03_model_comparison.ipynb   Section 4 outputs: 9 plots, 3 tables, timing, failure case
+figures/                 all figures saved by the notebooks
+results/                 experiment_log.csv, top_squares.json, per-square metrics/timing CSVs, saved predictions
+report/                  (reserved for the final PDF report - not built yet)
 ```
 
 ## Setup
@@ -45,86 +53,85 @@ python -m venv .venv
 pip install -r requirements.txt
 # torch is CPU-only; if the default index pulls a CUDA build, use:
 pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+# Register a Jupyter kernel for this venv (used by `jupyter nbconvert --execute`
+# and by the "mobiletraffic (.venv)" kernel the notebooks are saved with):
+python -m ipykernel install --user --name=mobiletraffic --display-name "mobiletraffic (.venv)"
 ```
 
 Download the raw daily `.txt` files (Telecom Italia SMS-Call-Internet-MI
-dataset, [1][2]) into `data/`.
+dataset, [1][2]) into `data/raw/`.
 
-## Running the pipeline
+## Running the notebooks
+
+Run in order - each one reads files the previous one wrote to `data/processed/`
+or `results/`:
 
 ```bash
-# 1. Aggregate raw text -> compact per-day Parquet, then combine
-cd src/data
-python build_dataset.py
-
-# 2. Exploratory analysis (figures + eda_summary.txt)
-cd ../analysis
-python eda.py
-
-# 3. Forecasting experiments: hyperparameter search + final evaluation for
-#    all 3 models across the 3 highest-traffic squares (Section 4). Produces
-#    9 forecast plots + a failure-case plot in reports/figures/, per-square
-#    metrics tables in reports/tables/, and a full trial log with hardware
-#    info in reports/experiment_log.md. Takes ~30-45 min on a 4-core CPU
-#    laptop (LSTM training dominates the runtime).
-cd ../models
-python run_experiments.py
+cd notebooks
+jupyter nbconvert --to notebook --execute --inplace --ExecutePreprocessor.kernel_name=mobiletraffic 00_data_pipeline.ipynb
+jupyter nbconvert --to notebook --execute --inplace --ExecutePreprocessor.kernel_name=mobiletraffic 01_eda.ipynb
+jupyter nbconvert --to notebook --execute --inplace --ExecutePreprocessor.kernel_name=mobiletraffic 02_experiments.ipynb
+jupyter nbconvert --to notebook --execute --inplace --ExecutePreprocessor.kernel_name=mobiletraffic 03_model_comparison.ipynb
 ```
+
+Or open them in Jupyter/VS Code and run all cells top to bottom in the same
+order. `00_data_pipeline.ipynb` is the slow one (~15-20 min - two passes over
+each of the 62 raw files); `02_experiments.ipynb` is the next slowest
+(~10-15 min - hyperparameter search + 9 final model/square fits, LSTM
+training dominates).
+
+## Adding a new model
+
+1. Subclass `forecasting.base.BaseForecaster` in a new
+   `forecasting/<name>_forecaster.py`.
+2. Implement `fit(series, exog=None)` (return `self`), `predict_one_step
+   (history) -> float`, and `describe() -> dict` (name/structure/input
+   representation/preprocessing/training procedure/hyperparameters - phrased
+   so it can be pasted into a report's Methodology section).
+3. Set a `PARAM_GRID` class attribute: a list of `dict`s, one per
+   hyperparameter combination `HyperparameterSearch` should try (not a
+   dict-of-lists to be cross-producted - keep the search space curated and
+   small, matching the SARIMA/GBM/LSTM examples).
+4. If `predict_one_step` would be expensive to call once per evaluated
+   timestamp when called via `WalkForwardEvaluator` (as SARIMA's Kalman
+   filter update is), cache whatever internal state lets repeated calls stay
+   cheap - see `SARIMAForecaster` for the pattern (track how much of
+   `history` has already been incorporated, append only the new tail).
+5. Nothing else needs to change: `HyperparameterSearch`, `WalkForwardEvaluator`,
+   and `ExperimentTracker` all work against the `BaseForecaster` interface,
+   and `02_experiments.ipynb` only needs the new class added to its
+   `forecaster_classes` dict to include it in the comparison.
 
 ## Data handling and memory management
 
 The raw dataset is ~20GB across 62 daily files (~4.8M rows/day: one row per
-`square_id x 10-minute interval x country_code`). Loading a day naively with
-`pandas.read_csv` (all 8 columns, default dtypes) peaks at **~453MB** of
-working set for a single ~322MB file. Extrapolated across all 62 files at
-once, a naive full-dataset load would require on the order of **25-30GB**
-of RAM - impractical on a typical laptop.
+`square_id x 10-minute interval x country_code`). `DataLoader.process_day`
+(`forecasting/data.py`) aggregates one day in two passes:
 
-The pipeline instead (`src/data/ingest.py`):
-1. Reads each file in **1M-row chunks** instead of all at once, bounding
-   peak memory to a small, constant multiple of the chunk size regardless
-   of file size.
-2. Reads only the **3 of 8 columns** needed for internet-traffic
-   forecasting (`square_id`, `timestamp_ms`, `internet_traffic`), skipping
-   SMS/call columns entirely at parse time.
-3. **Downcasts dtypes** - `square_id` to `int16` (ids run 1-10,000),
-   `internet_traffic` to `float32` - since the raw `int64`/`float64` range
-   is never needed.
-4. **Aggregates away the `country_code` dimension** per chunk (summing
-   internet traffic per `square_id, timestamp`), then combines the
-   per-chunk partial sums with a final groupby-sum. Summation is
-   associative, so chunkwise partial aggregation is exact.
-5. Persists one compact, compressed **Parquet** file per day instead of
-   keeping raw text or full precision in memory.
+1. **Pass 1** streams the file in chunks, reading only the timestamp column,
+   to collect the sorted set of unique 10-minute timestamps present (~144).
+2. **Pass 2** re-streams the file (square_id, timestamp, internet_traffic
+   only) and accumulates directly into a preallocated
+   `(10,000 squares x ~144 timestamps)` `float32` array via `np.add.at`
+   (correctly sums the multiple country-code rows per square/timestamp),
+   instead of building and concatenating per-chunk partial DataFrames.
 
-Measured on the same file (`sms-call-internet-mi-2013-11-01.txt`, 322MB,
-4,842,625 raw rows -> 1,439,982 aggregated rows), each approach run in its
-own process (`src/data/memory_naive.py` / `memory_optimized.py`), peak
-Windows working set (`psutil` `peak_wset`):
+This bounds peak memory by the array size (a few MB) plus one chunk's worth
+of raw rows - independent of file size or chunk count, an improvement on a
+single-pass chunk-then-concat-then-groupby strategy whose intermediate memory
+scales somewhat with chunk count. `00_data_pipeline.ipynb` measures this
+against a naive single-`read_csv`-all-columns baseline and reports the
+before/after numbers with hardware details.
 
-| Approach | Peak working set | Notes |
-|---|---|---|
-| Naive (`read_csv`, all columns, default dtypes) | ~453 MB | scales linearly with file size; does not fit the full 62-file dataset in memory at once |
-| Chunked + column pruning + downcast + aggregation | ~282 MB | bounded by chunk size; independent of how many files are processed |
-
-The full aggregated dataset (10,000 squares x ~144 intervals/day x 62 days)
-compresses from **20GB raw text to a few hundred MB of Parquet**, and loads
-back into memory comfortably (`int16`/`float32` columns) for the
-exploratory analysis and modeling stages.
-
-**Trade-offs.** Chunked aggregation trades a small amount of code
-complexity (partial-sum combination) for a large, dataset-size-independent
-memory bound. Downcasting to `float32` discards precision beyond ~7
-significant digits, which is immaterial for traffic values of this
-magnitude but would not be appropriate for computations requiring
-higher numerical precision.
-
-## Full report
-
-See [`reports/report.pdf`](reports/report.pdf) (or the source,
-[`reports/report.md`](reports/report.md)) for the complete research report:
-introduction, related work, methodology, results, discussion, conclusion,
-and full IEEE-style reference list.
+**Trade-offs.** The two-pass approach reads each raw file's timestamp column
+twice, trading a small amount of extra I/O and bookkeeping code for a memory
+bound that no longer depends on file size. The output is also a *dense*
+square x timestamp grid (absent combinations become an explicit 0.0 rather
+than a missing row) - a deliberate choice that guarantees a complete regular
+grid without a later per-day resample step, at the cost of a small, fixed
+amount of extra output size (see `forecasting/data.py`'s `DataLoader`
+docstring).
 
 ## References
 
@@ -132,3 +139,6 @@ and full IEEE-style reference list.
 of Milan and the Province of Trentino," *Sci Data*, vol. 2, 150055, 2015.
 [2] Telecom Italia, "Telecommunications - SMS, Call, Internet - MI,"
 Harvard Dataverse, doi:10.7910/DVN/EGZHFV.
+
+The full literature review behind the three model choices (5 sources, IEEE
+style) is in the markdown cell at the top of `notebooks/02_experiments.ipynb`.
