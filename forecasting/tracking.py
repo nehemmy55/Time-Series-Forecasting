@@ -1,6 +1,4 @@
-"""Structured experiment logging: every training run (grid search or
-manual) is recorded here instead of scattered print statements.
-"""
+"""Structured experiment logging: every training run is recorded here."""
 from __future__ import annotations
 
 import json
@@ -16,10 +14,7 @@ COLUMNS = [
 
 
 class ExperimentTracker:
-    """Appends one row per run to `log_path` (CSV, created with a header
-    on first use). Used identically by HyperparameterSearch (one row per
-    grid trial, plus one "selected" row with a closing rationale) and by
-    the final per-square evaluation runs in 02_experiments.ipynb."""
+    """Appends one row per run to `log_path` (CSV, created with a header on first use)."""
 
     def __init__(self, log_path: str | Path = "results/experiment_log.csv"):
         self.log_path = Path(log_path)

@@ -1,17 +1,5 @@
-"""SARIMA-family statistical forecaster: Fourier-augmented ARIMA.
-
-Chosen as the statistical paradigm (see the literature review at the top
-of notebooks/02_experiments.ipynb). A *literal* seasonal ARIMA term at the
-daily period (statsmodels `seasonal_order=(P,D,Q,144)`) is impractical on
-laptop-class hardware - a single such fit was measured taking over 19
-CPU-minutes without converging, versus ~5 seconds for a comparably-sized
-plain ARIMA fit (see notebooks/02_experiments.ipynb). Instead this follows
-the standard remedy for long seasonal periods (Hyndman & Athanasopoulos,
-"Forecasting: Principles and Practice", ch. 12): Fourier sine/cosine
-exogenous regressors for the daily cycle, plus a weekend dummy (see
-01_eda.ipynb's periodicity heatmap), wrapped around a low-order ARIMA
-error process.
-"""
+"""SARIMA-family statistical forecaster: Fourier-augmented ARIMA (a literal
+seasonal_order=(P,D,Q,144) term is impractical on laptop-class hardware)."""
 from __future__ import annotations
 
 import warnings
@@ -26,14 +14,8 @@ DAILY_PERIOD = 144
 
 
 def _fourier_and_weekend(index: pd.DatetimeIndex, n_harmonics: int) -> np.ndarray:
-    """Fourier phase computed from each timestamp's actual time-of-day
-    (minutes since midnight / 10), NOT from position within `index`. This
-    matters because predict_one_step() calls this on single-row slices one
-    step at a time - a position-based `t = arange(len(index))` would reset
-    to phase 0 (midnight) on every single call regardless of the row's real
-    time of day, silently corrupting the seasonal signal. Computing phase
-    from calendar time instead makes the result correct for any slice,
-    contiguous or not, one row or many."""
+    """Phase from each timestamp's actual time-of-day, not position in `index`
+    (needed since predict_one_step() calls this on single-row slices)."""
     t = (index.hour * 60 + index.minute) / 10  # 10-minute bin within the day, 0..143
     cols = {}
     for k in range(1, n_harmonics + 1):
@@ -44,8 +26,7 @@ def _fourier_and_weekend(index: pd.DatetimeIndex, n_harmonics: int) -> np.ndarra
 
 
 class SARIMAForecaster(BaseForecaster):
-    # A curated list of explicit combinations, not a full cartesian
-    # product - see notebooks/02_experiments.ipynb for the grid-search log.
+    # Curated combinations, not a full cartesian product.
     PARAM_GRID = [
         {"order": (1, 0, 1), "n_harmonics": 2},
         {"order": (1, 0, 1), "n_harmonics": 3},
@@ -77,10 +58,7 @@ class SARIMAForecaster(BaseForecaster):
         return self
 
     def predict_one_step(self, history: pd.Series) -> float:
-        """One call per evaluated timestamp, but internally O(1) amortized:
-        only the new tail of `history` since the last call is appended to
-        the cached filtered state (refit=False, a cheap Kalman-filter
-        update), not the whole history each time."""
+        """Appends only the new tail of `history` to the cached filtered state (refit=False)."""
         if self._results is None:
             raise RuntimeError("call fit() before predict_one_step()")
 

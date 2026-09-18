@@ -1,6 +1,4 @@
-"""The only place evaluation logic lives: one-step-ahead walk-forward
-evaluation, and the MAE/MAPE/RMSE metrics every model is scored with.
-"""
+"""One-step-ahead walk-forward evaluation and the MAE/MAPE/RMSE metrics."""
 from __future__ import annotations
 
 import time
@@ -26,12 +24,7 @@ def mape(y_true: np.ndarray, y_pred: np.ndarray, eps: float = 1.0) -> float:
 
 
 class WalkForwardEvaluator:
-    """True one-step-ahead evaluation: at each target timestamp t, the
-    model only ever sees the real series strictly before t (never a
-    previous prediction) and is scored against the real value at t. No
-    other module in this codebase computes MAE/MAPE/RMSE or runs a
-    prediction loop - HyperparameterSearch and the notebooks both go
-    through this class."""
+    """At each target timestamp, conditions only on real history, never a prior prediction."""
 
     def run(self, model: BaseForecaster, full_series: pd.Series, eval_index: pd.DatetimeIndex) -> dict:
         freq = full_series.index.freq or pd.Timedelta(minutes=10)

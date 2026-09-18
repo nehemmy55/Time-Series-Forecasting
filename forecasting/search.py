@@ -1,7 +1,4 @@
-"""Hyperparameter search over a BaseForecaster subclass's PARAM_GRID,
-evaluated via WalkForwardEvaluator and logged via ExperimentTracker - used
-identically for all three model types.
-"""
+"""Hyperparameter search over a BaseForecaster subclass's PARAM_GRID."""
 from __future__ import annotations
 
 import time

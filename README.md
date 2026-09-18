@@ -36,10 +36,10 @@ data/
     daily/*.parquet      one aggregated file per raw day (DataLoader output)
     internet_traffic.parquet   combined dataset: square_id, timestamp, internet_traffic
 notebooks/
-  00_data_pipeline.ipynb      Section 1: raw-file check, memory comparison, build the dataset, rank squares
-  01_eda.ipynb                Section 2: distribution, 5-square series, periodicity heatmap, ACF/PACF+ADF
-  02_experiments.ipynb        Section 3+4: literature review, hyperparameter search, final evaluation
-  03_model_comparison.ipynb   Section 4 outputs: 9 plots, 3 tables, timing, failure case
+  data_pipeline.ipynb      Section 1: raw-file check, memory comparison, build the dataset, rank squares
+  EDA.ipynb                Section 2: distribution, 5-square series, periodicity heatmap, ACF/PACF+ADF
+  experiments.ipynb        Section 3+4: literature review, hyperparameter search, final evaluation
+  model_comparison.ipynb   Section 4 outputs: 9 plots, 3 tables, timing, failure case
 figures/                 all figures saved by the notebooks
 results/                 experiment_log.csv, top_squares.json, per-square metrics/timing CSVs, saved predictions
 report/                  (reserved for the final PDF report - not built yet)
@@ -69,15 +69,15 @@ or `results/`:
 
 ```bash
 cd notebooks
-jupyter nbconvert --to notebook --execute --inplace --ExecutePreprocessor.kernel_name=mobiletraffic 00_data_pipeline.ipynb
-jupyter nbconvert --to notebook --execute --inplace --ExecutePreprocessor.kernel_name=mobiletraffic 01_eda.ipynb
-jupyter nbconvert --to notebook --execute --inplace --ExecutePreprocessor.kernel_name=mobiletraffic 02_experiments.ipynb
-jupyter nbconvert --to notebook --execute --inplace --ExecutePreprocessor.kernel_name=mobiletraffic 03_model_comparison.ipynb
+jupyter nbconvert --to notebook --execute --inplace --ExecutePreprocessor.kernel_name=mobiletraffic data_pipeline.ipynb
+jupyter nbconvert --to notebook --execute --inplace --ExecutePreprocessor.kernel_name=mobiletraffic EDA.ipynb
+jupyter nbconvert --to notebook --execute --inplace --ExecutePreprocessor.kernel_name=mobiletraffic experiments.ipynb
+jupyter nbconvert --to notebook --execute --inplace --ExecutePreprocessor.kernel_name=mobiletraffic model_comparison.ipynb
 ```
 
 Or open them in Jupyter/VS Code and run all cells top to bottom in the same
-order. `00_data_pipeline.ipynb` is the slow one (~15-20 min - two passes over
-each of the 62 raw files); `02_experiments.ipynb` is the next slowest
+order. `data_pipeline.ipynb` is the slow one (~15-20 min - two passes over
+each of the 62 raw files); `experiments.ipynb` is the next slowest
 (~10-15 min - hyperparameter search + 9 final model/square fits, LSTM
 training dominates).
 
@@ -104,7 +104,7 @@ training dominates).
    `history` has already been incorporated, append only the new tail).
 5. Nothing else needs to change: `HyperparameterSearch`, `WalkForwardEvaluator`,
    and `ExperimentTracker` all work against the `BaseForecaster` interface,
-   and `02_experiments.ipynb` only needs the new class added to its
+   and `experiments.ipynb` only needs the new class added to its
    `forecaster_classes` dict to include it in the comparison.
 
 ## Data handling and memory management
@@ -124,7 +124,7 @@ The raw dataset is ~20GB across 62 daily files (~4.8M rows/day: one row per
 This bounds peak memory by the array size (a few MB) plus one chunk's worth
 of raw rows - independent of file size or chunk count, an improvement on a
 single-pass chunk-then-concat-then-groupby strategy whose intermediate memory
-scales somewhat with chunk count. `00_data_pipeline.ipynb` measures this
+scales somewhat with chunk count. `data_pipeline.ipynb` measures this
 against a naive single-`read_csv`-all-columns baseline and reports the
 before/after numbers with hardware details.
 
@@ -145,4 +145,4 @@ of Milan and the Province of Trentino," *Sci Data*, vol. 2, 150055, 2015.
 Harvard Dataverse, doi:10.7910/DVN/EGZHFV.
 
 The full literature review behind the three model choices (5 sources, IEEE
-style) is in the markdown cell at the top of `notebooks/02_experiments.ipynb`.
+style) is in the markdown cell at the top of `notebooks/experiments.ipynb`.

@@ -1,5 +1,4 @@
-"""Shared matplotlib styling: a validated colorblind-safe palette, applied
-consistently across every figure produced by the notebooks."""
+"""Shared matplotlib styling: a colorblind-safe palette used by every figure."""
 import matplotlib.pyplot as plt
 
 CATEGORICAL = [

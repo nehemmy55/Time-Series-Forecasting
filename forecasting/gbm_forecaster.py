@@ -1,11 +1,4 @@
-"""Gradient Boosting forecaster: lag + calendar features, tree ensemble.
-
-Chosen as the GBM-based / feature-engineered ML paradigm (see the
-literature review at the top of notebooks/02_experiments.ipynb): a
-computationally cheap alternative to a sequence model when the modeler can
-hand-engineer informative lags, competitive with deep sequence models on
-network traffic while training in seconds (Kim, 2024/25).
-"""
+"""Gradient Boosting forecaster: lag + calendar features, tree ensemble."""
 from __future__ import annotations
 
 import numpy as np
@@ -14,9 +7,7 @@ from sklearn.ensemble import GradientBoostingRegressor
 
 from forecasting.base import BaseForecaster
 
-# 10-30 min, 1-4 hours, and one full day - see 01_eda.ipynb's PACF result
-# (direct dependence concentrated in the first ~5 lags) and ACF result
-# (daily periodicity) for the justification.
+# 10-30 min, 1-4 hours, and one full day (see EDA.ipynb's PACF/ACF).
 LAGS = [1, 2, 3, 6, 12, 18, 24, 144]
 
 
@@ -36,19 +27,14 @@ def _calendar_features(index: pd.DatetimeIndex) -> pd.DataFrame:
 
 
 def _feature_row(history: pd.Series, target_ts: pd.Timestamp) -> pd.DataFrame:
-    """One feature row for predicting `target_ts`, built from lags of the
-    known `history` (which must end at target_ts - one interval) plus
-    calendar features of target_ts itself (always known in advance)."""
+    """One feature row for predicting `target_ts` from lags of `history` plus calendar features."""
     row = {f"lag_{lag}": history.iloc[-lag] for lag in LAGS}
     row_df = pd.DataFrame([row], index=[target_ts])
     return row_df.join(_calendar_features(pd.DatetimeIndex([target_ts])))
 
 
 class GBMForecaster(BaseForecaster):
-    # A curated list of explicit combinations (not a dict-of-lists to be
-    # cross-producted) - keeps the search space small and deliberate rather
-    # than exhaustive. See HyperparameterSearch, which iterates PARAM_GRID
-    # directly as one dict of kwargs per trial.
+    # Curated combinations, not a dict-of-lists cross product.
     PARAM_GRID = [
         {"n_estimators": 100, "max_depth": 3, "learning_rate": 0.1},
         {"n_estimators": 200, "max_depth": 3, "learning_rate": 0.1},

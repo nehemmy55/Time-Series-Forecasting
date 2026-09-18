@@ -1,9 +1,4 @@
-"""LSTM forecaster: a small end-to-end recurrent network (PyTorch, CPU).
-
-Chosen as the RNN-family paradigm (see the literature review at the top of
-notebooks/02_experiments.ipynb): learns temporal dependencies end-to-end
-from a raw window of history, rather than from hand-picked lags.
-"""
+"""LSTM forecaster: a small end-to-end recurrent network (PyTorch, CPU)."""
 from __future__ import annotations
 
 import numpy as np
@@ -34,8 +29,7 @@ class _LSTMNet(nn.Module):
 
 
 class LSTMForecaster(BaseForecaster):
-    # A curated list of explicit combinations, not a full cartesian
-    # product - see notebooks/02_experiments.ipynb for the grid-search log.
+    # Curated combinations, not a full cartesian product.
     PARAM_GRID = [
         {"hidden_size": 16, "num_layers": 1, "lr": 1e-3},
         {"hidden_size": 32, "num_layers": 1, "lr": 1e-3},

@@ -1,6 +1,5 @@
-"""Memory-efficient data loading: two-pass raw-file aggregation
-(DataLoader) and the single reconstruction path every notebook uses to get
-one square's traffic series (SquareSeries).
+"""Memory-efficient data loading: two-pass raw-file aggregation and the
+single reconstruction path every notebook uses to get one square's series.
 """
 from __future__ import annotations
 
@@ -12,17 +11,13 @@ import numpy as np
 import pandas as pd
 import psutil
 
-# --- raw schema -------------------------------------------------------
-
 RAW_COLUMNS = [
     "square_id", "timestamp_ms", "country_code",
     "sms_in", "sms_out", "call_in", "call_out", "internet_traffic",
 ]
 USE_COLUMNS = [0, 1, 7]
 USE_NAMES = ["square_id", "timestamp_ms", "internet_traffic"]
-N_SQUARES = 10_000  # square ids are known to run 1..10000 (dataset schema)
-
-# --- standard time-based split (10-minute resolution) ------------------
+N_SQUARES = 10_000  # square ids run 1..10000 (dataset schema)
 
 TUNING_TRAIN_END = pd.Timestamp("2013-12-08 23:50:00")
 TUNING_VAL_END = pd.Timestamp("2013-12-15 23:50:00")
@@ -33,28 +28,7 @@ DAILY_PERIOD = 144  # 10-minute bins per day
 
 
 class DataLoader:
-    """Two-pass chunked aggregation of one raw daily file (or all of them).
-
-    Pass 1 streams the file in chunks reading only the timestamp column, to
-    collect the sorted set of unique 10-minute timestamps present that day
-    (~144 values). Pass 2 re-streams the file (square_id, timestamp,
-    internet_traffic columns only) and accumulates directly into a
-    preallocated (N_SQUARES, n_timestamps) float32 array via `np.add.at`
-    (correctly sums the multiple country_code rows per square/timestamp),
-    instead of building and concatenating per-chunk partial DataFrames.
-
-    This bounds peak memory by the array size (~N_SQUARES * 144 * 4 bytes,
-    a few MB) plus one chunk's worth of raw rows, independent of both file
-    size and chunk count - an improvement on a single-pass
-    chunk-then-concat-then-groupby strategy, whose intermediate memory
-    scales somewhat with the number of chunks processed.
-
-    The dense array also means every (square_id, timestamp) pair that
-    could exist gets a row (0.0 if genuinely absent from the raw file),
-    guaranteeing a complete grid without a later resample step for
-    within-day gaps - SquareSeries.load() still resamples/interpolates,
-    but only to bridge whole missing *days*, not scattered missing rows.
-    """
+    """Two-pass chunked aggregation of one raw daily file (or all of them)."""
 
     def __init__(self, chunksize: int = 1_000_000):
         self.chunksize = chunksize
@@ -93,7 +67,6 @@ class DataLoader:
             col_idx = chunk["timestamp_ms"].map(ts_to_col).to_numpy(dtype="int64")
             np.add.at(matrix, (row_idx, col_idx), chunk["internet_traffic"].to_numpy())
 
-        # Fixed-size (N_SQUARES x n_ts) -> tidy long-format DataFrame, once.
         square_ids = np.repeat(np.arange(1, N_SQUARES + 1, dtype="int16"), n_ts)
         timestamps = np.tile(timestamps_ms, N_SQUARES)
         daily = pd.DataFrame({
@@ -138,8 +111,7 @@ class DataLoader:
 
 
 def naive_load_day(raw_path: Path) -> int:
-    """Baseline for the memory comparison: one full read_csv, all 8
-    columns, default (64-bit) dtypes - no chunking, no downcasting."""
+    """Baseline for the memory comparison: one full read_csv, no chunking or downcasting."""
     df = pd.read_csv(raw_path, sep="\t", header=None, names=RAW_COLUMNS)
     return len(df)
 
@@ -151,11 +123,7 @@ def _measure_worker(func, args, kwargs, queue) -> None:
 
 
 def measure_peak_memory(func, *args, **kwargs) -> int:
-    """Run `func(*args, **kwargs)` in an isolated child process and return
-    its peak working-set size in bytes (psutil `peak_wset` on Windows,
-    falling back to `rss` elsewhere). Isolating in a subprocess is what
-    makes the naive-vs-optimized comparison fair: each measurement starts
-    from a clean process, not accumulated state from previous calls."""
+    """Run `func` in an isolated child process and return its peak working-set size in bytes."""
     ctx = multiprocessing.get_context("spawn")
     queue = ctx.Queue()
     proc = ctx.Process(target=_measure_worker, args=(func, args, kwargs, queue))
@@ -166,9 +134,7 @@ def measure_peak_memory(func, *args, **kwargs) -> int:
 
 
 class SquareSeries:
-    """The one path every notebook uses to reconstruct a square's traffic
-    series: read (pyarrow predicate pushdown on square_id), dedup, resample
-    to a strict 10-minute grid, interpolate any gaps."""
+    """The one path every notebook uses to reconstruct a square's traffic series."""
 
     def __init__(self, square_id: int, processed_path: Path):
         self.square_id = square_id
@@ -190,19 +156,3 @@ class SquareSeries:
             )
             self._series = s
         return self._series
-
-    @staticmethod
-    def split(
-        series: pd.Series,
-        tuning_train_end: pd.Timestamp = TUNING_TRAIN_END,
-        tuning_val_end: pd.Timestamp = TUNING_VAL_END,
-        final_train_end: pd.Timestamp = FINAL_TRAIN_END,
-        test_start: pd.Timestamp = TEST_START,
-        test_end: pd.Timestamp = TEST_END,
-    ) -> dict:
-        return {
-            "tuning_train": series.loc[:tuning_train_end],
-            "tuning_val": series.loc[tuning_train_end + pd.Timedelta(minutes=10) : tuning_val_end],
-            "final_train": series.loc[:final_train_end],
-            "test": series.loc[test_start:test_end],
-        }
