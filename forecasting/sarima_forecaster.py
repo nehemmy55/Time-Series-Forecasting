@@ -26,7 +26,15 @@ DAILY_PERIOD = 144
 
 
 def _fourier_and_weekend(index: pd.DatetimeIndex, n_harmonics: int) -> np.ndarray:
-    t = np.arange(len(index))
+    """Fourier phase computed from each timestamp's actual time-of-day
+    (minutes since midnight / 10), NOT from position within `index`. This
+    matters because predict_one_step() calls this on single-row slices one
+    step at a time - a position-based `t = arange(len(index))` would reset
+    to phase 0 (midnight) on every single call regardless of the row's real
+    time of day, silently corrupting the seasonal signal. Computing phase
+    from calendar time instead makes the result correct for any slice,
+    contiguous or not, one row or many."""
+    t = (index.hour * 60 + index.minute) / 10  # 10-minute bin within the day, 0..143
     cols = {}
     for k in range(1, n_harmonics + 1):
         cols[f"sin_{k}"] = np.sin(2 * np.pi * k * t / DAILY_PERIOD)
