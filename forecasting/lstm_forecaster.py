@@ -51,7 +51,7 @@ class LSTMForecaster(BaseForecaster):
         self.std_: float | None = None
         self.epochs_run_: int | None = None
 
-    def fit(self, series: pd.Series, exog: pd.DataFrame | None = None) -> "LSTMForecaster":
+    def fit(self, series: pd.Series) -> "LSTMForecaster":
         self.mean_, self.std_ = float(series.mean()), float(series.std())
         norm = ((series - self.mean_) / self.std_).values.astype("float32")
 

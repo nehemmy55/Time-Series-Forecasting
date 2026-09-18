@@ -62,7 +62,7 @@ class GBMForecaster(BaseForecaster):
         self.learning_rate = learning_rate
         self.model: GradientBoostingRegressor | None = None
 
-    def fit(self, series: pd.Series, exog: pd.DataFrame | None = None) -> "GBMForecaster":
+    def fit(self, series: pd.Series) -> "GBMForecaster":
         lag_data = {f"lag_{lag}": series.shift(lag) for lag in LAGS}
         table = pd.DataFrame(lag_data, index=series.index)
         table = table.join(_calendar_features(series.index))

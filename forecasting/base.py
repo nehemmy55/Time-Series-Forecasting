@@ -25,8 +25,18 @@ class BaseForecaster(ABC):
     PARAM_GRID: list = []
 
     @abstractmethod
-    def fit(self, series: pd.Series, exog: pd.DataFrame | None = None) -> "BaseForecaster":
-        """Fit the model on a training series. Returns self (chaining)."""
+    def fit(self, series: pd.Series) -> "BaseForecaster":
+        """Fit the model on a training series. Returns self (chaining).
+
+        Deliberately no `exog` parameter: each of the three concrete models
+        needs a different, model-specific derived signal (SARIMA's Fourier
+        terms, none for GBM/LSTM beyond what's already in `series`), and
+        all three compute it internally from `series.index` rather than
+        accepting it from the caller - so a generic external-exog parameter
+        would be accepted by the interface but ignored by every subclass.
+        Add it back only if a future model genuinely needs caller-supplied
+        exogenous data it cannot derive from the series' own index.
+        """
         raise NotImplementedError
 
     @abstractmethod

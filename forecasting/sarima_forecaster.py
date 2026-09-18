@@ -62,7 +62,7 @@ class SARIMAForecaster(BaseForecaster):
         self._incorporated_len = 0
         self._freq: pd.Timedelta | None = None
 
-    def fit(self, series: pd.Series, exog: pd.DataFrame | None = None) -> "SARIMAForecaster":
+    def fit(self, series: pd.Series) -> "SARIMAForecaster":
         exog_arr = _fourier_and_weekend(series.index, self.n_harmonics)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")

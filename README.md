@@ -15,7 +15,7 @@ than each notebook reimplementing its own prediction loop.
 
 | Module | Contents |
 |---|---|
-| `base.py` | `BaseForecaster` - the abstract interface every model implements: `fit(series, exog=None)`, `predict_one_step(history) -> float`, `describe() -> dict`, and a `PARAM_GRID` class attribute. |
+| `base.py` | `BaseForecaster` - the abstract interface every model implements: `fit(series)`, `predict_one_step(history) -> float`, `describe() -> dict`, and a `PARAM_GRID` class attribute. |
 | `data.py` | `DataLoader` (two-pass chunked aggregation of raw daily files), `SquareSeries` (the one path used everywhere to load/resample/interpolate a square's series), `naive_load_day` / `measure_peak_memory` (the Section-1 memory comparison), and the standard train/val/test split boundaries. |
 | `sarima_forecaster.py` | `SARIMAForecaster` - Fourier-augmented SARIMA (statsmodels). |
 | `gbm_forecaster.py` | `GBMForecaster` - gradient boosting over lag + calendar features (scikit-learn). |
@@ -85,10 +85,14 @@ training dominates).
 
 1. Subclass `forecasting.base.BaseForecaster` in a new
    `forecasting/<name>_forecaster.py`.
-2. Implement `fit(series, exog=None)` (return `self`), `predict_one_step
-   (history) -> float`, and `describe() -> dict` (name/structure/input
+2. Implement `fit(series)` (return `self`), `predict_one_step(history) ->
+   float`, and `describe() -> dict` (name/structure/input
    representation/preprocessing/training procedure/hyperparameters - phrased
-   so it can be pasted into a report's Methodology section).
+   so it can be pasted into a report's Methodology section). There's
+   deliberately no `exog` parameter on `fit` - each model derives whatever
+   extra signal it needs (e.g. SARIMA's Fourier terms) from `series.index`
+   itself; add one only if a new model genuinely needs external data it
+   can't derive that way.
 3. Set a `PARAM_GRID` class attribute: a list of `dict`s, one per
    hyperparameter combination `HyperparameterSearch` should try (not a
    dict-of-lists to be cross-producted - keep the search space curated and
