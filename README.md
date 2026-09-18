@@ -26,15 +26,15 @@ src/
   models/
     common.py                  splits, input representation, metrics, timing, hardware info
     sarima_model.py            Model 1: Fourier-augmented SARIMA (statsmodels)
-    gbm_model.py                Model 2: gradient boosting on lag + calendar features (sklearn)
-    lstm_model.py               Model 3: LSTM (PyTorch, CPU)
+    gbm_model.py               Model 2: gradient boosting on lag + calendar features (sklearn)
+    lstm_model.py              Model 3: LSTM (PyTorch, CPU)
     run_experiments.py         orchestrates tuning + evaluation + all Section 4 outputs
 reports/
   figures/                     generated figures (EDA + 9 forecast plots + failure case)
   tables/                      per-square metrics CSVs + timing.csv
   eda_summary.txt              generated numeric evidence (top squares, ADF test, ...)
   experiment_log.md            hyperparameter search trials + hardware info
-  report.md                    full research report (Sections 1-8)
+  report.md / report.pdf       full research report (source + rendered PDF)
 ```
 
 ## Setup
@@ -121,9 +121,10 @@ higher numerical precision.
 
 ## Full report
 
-See [`reports/report.md`](reports/report.md) for the complete research report
-(introduction, related work, methodology, results, discussion, conclusion,
-and full IEEE-style reference list).
+See [`reports/report.pdf`](reports/report.pdf) (or the source,
+[`reports/report.md`](reports/report.md)) for the complete research report:
+introduction, related work, methodology, results, discussion, conclusion,
+and full IEEE-style reference list.
 
 ## References
 
