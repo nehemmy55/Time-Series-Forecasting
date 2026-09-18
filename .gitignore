@@ -9,4 +9,4 @@ data/
 *.zip
 *.parquet
 *.log
-
+*.py
