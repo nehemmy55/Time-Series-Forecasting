@@ -23,10 +23,18 @@ src/
   analysis/
     style.py                   shared plotting style (colorblind-safe palette)
     eda.py                     exploratory analysis, produces reports/figures/*.png
-  models/                      forecasting models (Section 4, in progress)
+  models/
+    common.py                  splits, input representation, metrics, timing, hardware info
+    sarima_model.py            Model 1: Fourier-augmented SARIMA (statsmodels)
+    gbm_model.py                Model 2: gradient boosting on lag + calendar features (sklearn)
+    lstm_model.py               Model 3: LSTM (PyTorch, CPU)
+    run_experiments.py         orchestrates tuning + evaluation + all Section 4 outputs
 reports/
-  figures/                     generated figures
+  figures/                     generated figures (EDA + 9 forecast plots + failure case)
+  tables/                      per-square metrics CSVs + timing.csv
   eda_summary.txt              generated numeric evidence (top squares, ADF test, ...)
+  experiment_log.md            hyperparameter search trials + hardware info
+  report.md                    full research report (Sections 1-8)
 ```
 
 ## Setup
@@ -35,6 +43,8 @@ reports/
 python -m venv .venv
 .venv/Scripts/activate        # Windows
 pip install -r requirements.txt
+# torch is CPU-only; if the default index pulls a CUDA build, use:
+pip install torch --index-url https://download.pytorch.org/whl/cpu
 ```
 
 Download the raw daily `.txt` files (Telecom Italia SMS-Call-Internet-MI
@@ -50,6 +60,15 @@ python build_dataset.py
 # 2. Exploratory analysis (figures + eda_summary.txt)
 cd ../analysis
 python eda.py
+
+# 3. Forecasting experiments: hyperparameter search + final evaluation for
+#    all 3 models across the 3 highest-traffic squares (Section 4). Produces
+#    9 forecast plots + a failure-case plot in reports/figures/, per-square
+#    metrics tables in reports/tables/, and a full trial log with hardware
+#    info in reports/experiment_log.md. Takes ~30-45 min on a 4-core CPU
+#    laptop (LSTM training dominates the runtime).
+cd ../models
+python run_experiments.py
 ```
 
 ## Data handling and memory management
@@ -99,6 +118,12 @@ memory bound. Downcasting to `float32` discards precision beyond ~7
 significant digits, which is immaterial for traffic values of this
 magnitude but would not be appropriate for computations requiring
 higher numerical precision.
+
+## Full report
+
+See [`reports/report.md`](reports/report.md) for the complete research report
+(introduction, related work, methodology, results, discussion, conclusion,
+and full IEEE-style reference list).
 
 ## References
 
